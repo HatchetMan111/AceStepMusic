@@ -1,0 +1,21 @@
+[Unit]
+Description=ACE-Step 1.5 WebUI (Gradio :7860)
+Documentation=https://github.com/ace-step/ACE-Step-1.5
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ace
+Group=ace
+WorkingDirectory=/opt/ace-step
+Environment=PYTHONUNBUFFERED=1
+Environment=GRADIO_SERVER_NAME=0.0.0.0
+Environment=GRADIO_SERVER_PORT=7860
+Environment=PORT=7860
+ExecStart=/opt/ace-step/.venv/bin/acestep
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
