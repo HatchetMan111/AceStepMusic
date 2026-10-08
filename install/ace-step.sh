@@ -88,7 +88,7 @@ Optionen:
   --storage NAME       Disk-Storage (Default: auto, bevorzugt local-lvm)
   --bridge NAME        Netzwerk-Bridge (Default: ${DEFAULT_BRIDGE})
   --gpu PCI            NVIDIA-Passthrough, z.B. 0000:01:00 (Default: kein Passthrough = CPU-Modus)
-  --sshkey PATH        SSH Public Key (PFLICHT, nur Key-Login moeglich)
+  --sshkey PATH        SSH Public Key (optional: ohne Flag wird ein Host-Key genommen oder erzeugt)
   --ciuser NAME        Cloud-Init-User (Default: ${DEFAULT_CIUSER})
   --ip CIDR/IP          z.B. --ip 192.168.178.50/24 (+ --gateway): statisch per Cloud-Init,
                      als reine IP auch Update-Override (ueberspringt Agent-Wait)
@@ -183,11 +183,21 @@ if [[ "$HOST_FREE_MB" -gt 0 && "$RAM" -gt "$HOST_FREE_MB" ]]; then
   exit 1
 fi
 
+# SSH-Key: optional – fehlt --sshkey, wird automatisch ein vorhandener
+# Host-Key genommen oder einer erzeugt, damit der blosse Einzeiler
+# ohne Flags funktioniert (Debian-Cloud-Images brauchen Key-Login).
 if [[ -z "${SSHKEY:-}" ]]; then
-  msg_error "--sshkey fehlt und ist Pflicht: Debian-Cloud-Images lassen nur Key-Login zu"
-  msg_error "Key erzeugen (einmalig): ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ''"
-  msg_error "Dann: bash ace-step.sh --sshkey ~/.ssh/id_ed25519.pub --ip 192.168.178.50/24 --gateway 192.168.178.1 [...]"
-  exit 1
+  for _k in "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/id_rsa.pub" "$HOME/.ssh/id_ecdsa.pub"; do
+    if [[ -f "$_k" ]]; then SSHKEY="$_k"; break; fi
+  done
+  if [[ -z "${SSHKEY:-}" ]]; then
+    msg_info "Kein SSH-Key auf dem Host – erzeuge ~/.ssh/id_ed25519 (ohne Passphrase) ..."
+    mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+    ssh-keygen -t ed25519 -f "$HOME/.ssh/id_ed25519" -N '' -C "ace-step-proxmox" \
+      || { msg_error "ssh-keygen scheiterte – bitte manuell erzeugen und --sshkey PATH uebergeben."; exit 1; }
+    SSHKEY="$HOME/.ssh/id_ed25519.pub"
+  fi
+  msg_info "SSH-Key (auto): $SSHKEY"
 fi
 [[ -f "$SSHKEY" ]] || { msg_error "SSH-Key nicht gefunden: $SSHKEY"; exit 1; }
 
