@@ -7,32 +7,35 @@
 
 ## Einzeiler (auf dem Proxmox-Host als root)
 
+Schritt für Schritt (kopierfertig):
+
 ```bash
+# 1. Installieren – das war's schon:
+#    SSH-Key wird automatisch genommen oder erzeugt, IP per DHCP,
+#    VM-ID ist immer die nächste freie:
 bash -c "$(wget -qLO - https://raw.githubusercontent.com/HatchetMan111/AceStepMusic/main/install/ace-step.sh)"
 ```
 
-Das war's: SSH-Key wird automatisch genommen oder erzeugt, IP per DHCP,
-VM-ID ist immer die nächste freie. Alles darunter ist optional.
-
-<details>
-<summary>Optional: mit Flags (statische IP, GPU, eigene Ressourcen)</summary>
+Alternative ohne `bash -c` (Datei laden, dann normal starten):
 
 ```bash
-# Mit statischer IP (empfohlen wenn DHCP klemmt, z.B. FritzBox-Netz).
-# Das `_` nach dem schließenden `"` ist Absicht – ohne es kommen
-# die Flags bei `bash -c` nicht an:
-bash -c "$(wget -qLO - https://raw.githubusercontent.com/HatchetMan111/AceStepMusic/main/install/ace-step.sh)" _ --ip 192.168.178.50/24 --gateway 192.168.178.1
+wget -qO ace-step.sh https://raw.githubusercontent.com/HatchetMan111/AceStepMusic/main/install/ace-step.sh
+bash ace-step.sh
 ```
+
+Weitere Anpassungen (ID immer **nächste freie**, außer gesetzt):
 
 ```bash
 VMID=150 CORES=8 RAM=16384 DISK=60 bash -c "$(wget -qLO - https://raw.githubusercontent.com/HatchetMan111/AceStepMusic/main/install/ace-step.sh)"
 bash ace-step.sh --vmid 150 --cores 4 --memory 16384 --disk 60 --bridge vmbr0 --storage local-lvm
+# Mit statischer IP (empfohlen wenn DHCP klemmt, z.B. FritzBox-Netz).
+# Das `_` nach dem schließenden `"` ist Absicht – ohne es kommen
+# die Flags bei `bash -c` nicht an:
+bash ace-step.sh --ip 192.168.178.50/24 --gateway 192.168.178.1
 bash ace-step.sh --gpu 0000:01:00   # NVIDIA-Passthrough (sonst CPU-Modus)
 bash ace-step.sh --sshkey ~/.ssh/id_rsa.pub   # eigener Key statt Auto-Key
 bash ace-step.sh --debug   # = bash -x, komplette Fehlermeldungskette + Log unter /tmp/ace-step-install-*.log
 ```
-
-</details>
 
 | Eigenschaft | Wert |
 |---|---|
