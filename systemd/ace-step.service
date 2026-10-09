@@ -10,10 +10,8 @@ User=ace
 Group=ace
 WorkingDirectory=/opt/ace-step
 Environment=PYTHONUNBUFFERED=1
-Environment=GRADIO_SERVER_NAME=0.0.0.0
-Environment=GRADIO_SERVER_PORT=7860
-Environment=PORT=7860
-ExecStart=/opt/ace-step/.venv/bin/acestep
+# Upstream-Default ist 127.0.0.1 (nur localhost) – explizite Flags, kein GRADIO_*-Env:
+ExecStart=/opt/ace-step/.venv/bin/acestep --port 7860 --server-name 0.0.0.0
 Restart=always
 RestartSec=10
 

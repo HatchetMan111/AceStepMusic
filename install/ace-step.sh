@@ -430,6 +430,16 @@ test -x /opt/ace-step/.venv/bin/acestep
 if [ ! -f /opt/ace-step/.env ] && [ -f /opt/ace-step/.env.example ]; then
   cp /opt/ace-step/.env.example /opt/ace-step/.env
 fi
+# Web UI muss auf 0.0.0.0 lauschen: Upstream-Default ist SERVER_NAME=127.0.0.1
+# (nur localhost) – GRADIO_*-Env greift hier NICHT, es zaehlen --server-name/--port.
+for _kv in "SERVER_NAME=0.0.0.0" "PORT=7860"; do
+  _k="${_kv%%=*}"
+  if grep -q "^[#]*${_k}=" /opt/ace-step/.env 2>/dev/null; then
+    sed -i "s/^[#]*${_k}=.*/${_kv}/" /opt/ace-step/.env
+  else
+    echo "$_kv" >> /opt/ace-step/.env
+  fi
+done
 # Modelle laden beim Erststart automatisch nach (best-effort Vorab-Download nur Warnung)
 echo "INFO: Modelle (DiT + LM) laden beim ersten Start automatisch nach – erster Start dauert."
 GUEST_EOF
@@ -451,10 +461,7 @@ Type=simple
 User=${CIUSER}
 WorkingDirectory=${APP_DIR}
 Environment=PYTHONUNBUFFERED=1
-Environment=GRADIO_SERVER_NAME=0.0.0.0
-Environment=GRADIO_SERVER_PORT=${APP_PORT}
-Environment=PORT=${APP_PORT}
-ExecStart=${APP_DIR}/.venv/bin/acestep
+ExecStart=${APP_DIR}/.venv/bin/acestep --port ${APP_PORT} --server-name 0.0.0.0
 Restart=always
 RestartSec=10
 
