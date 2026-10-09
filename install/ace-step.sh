@@ -277,6 +277,24 @@ qm config "$VMID" | grep -qi "sshkeys" && msg_ok "SSH-Key in qm config vorhanden
   || msg_warn "Kein sshkeys in qm config – SSH wird evtl. fehlschlagen."
 qm start "$VMID" 2>/dev/null || true
 
+# Statische IP aus --ip (mit Netzmaske) in die VM-Config schreiben und
+# rebooten, damit Cloud-Init sie beim Boot anwendet. Auch im Update-Modus:
+# vorher wurde --ip dort ignoriert (nur Warte-Override). Reine IP ohne
+# Maske = weiterhin nur Override, Config bleibt unangetastet.
+if [[ "$IPCFG" != "dhcp" && "$IPCFG" == */* ]]; then
+  WANT_IPCFG="ip=$IPCFG"
+  [[ -n "$GATEWAY" ]] && WANT_IPCFG="$WANT_IPCFG,gw=$GATEWAY"
+  CUR_IPCFG="$(qm config "$VMID" 2>/dev/null | grep -oP '^ipconfig0: \K.*' || true)"
+  if [[ "$CUR_IPCFG" != "$WANT_IPCFG" ]]; then
+    msg_info "Uebernehme statische IP in VM-Config: $WANT_IPCFG ..."
+    qm set "$VMID" --ipconfig0 "$WANT_IPCFG"
+    msg_info "Reboote VM $VMID (Cloud-Init wendet neue IP an) ..."
+    qm reboot "$VMID" 2>/dev/null || { qm stop "$VMID" 2>/dev/null || true; sleep 5; qm start "$VMID"; }
+  else
+    msg_ok "Statische IP bereits in VM-Config: $CUR_IPCFG"
+  fi
+fi
+
 # ---------------------------------------------------------------------------
 # 4. Gast-IP + SSH warten (agent-unabhaengig: Ping + Agent + ARP/DHCP)
 # ---------------------------------------------------------------------------
@@ -331,7 +349,19 @@ if [[ -z "${VM_IP:-}" ]]; then
   msg_error " 1) qm terminal $VMID -> login ace -> ip -4 addr; systemctl status qemu-guest-agent"
   msg_error " 2) Bleibt ip leer: DHCP auf $BRIDGE fehlt -> statische IP setzen und Update-Modus:"
   msg_error "    bash ace-step.sh --vmid $VMID --ip <GEFUNDENE-ODER-GEWUENSCHTE-IP>"
+  msg_error "    (mit Netzmaske, z.B. --ip 192.168.178.50/24 --gateway 192.168.178.1:"
+  msg_error "     wird in die VM-Config geschrieben + rebootet, Cloud-Init wendet sie an)"
   msg_error " 3) Update-Modus: bash ace-step.sh --vmid $VMID (VM bleibt bestehen, idempotent)."
+  # Vorschlag: Subnetz der Bridge erkennen und fertigen --ip-Befehl anbieten
+  BR_IPCIDR="$(ip -4 addr show dev "$BRIDGE" 2>/dev/null | grep -oP 'inet \K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+' | head -n1 || true)"
+  if [[ -n "${BR_IPCIDR:-}" ]]; then
+    BR_BASE="$(printf '%s' "$BR_IPCIDR" | grep -oP '^[0-9]+\.[0-9]+\.[0-9]+')"
+    BR_MASK="$(printf '%s' "$BR_IPCIDR" | grep -oP '/\K[0-9]+')"
+    BR_GW="$(ip -4 route show dev "$BRIDGE" 2>/dev/null | grep -oP '^default via \K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)"
+    [[ -z "${BR_GW:-}" ]] && BR_GW="${BR_BASE}.1"
+    msg_error "Vorschlag fuer dein Netz (freie IP vorher per ping pruefen):"
+    msg_error "  bash ace-step.sh --vmid $VMID --ip ${BR_BASE}.110/${BR_MASK} --gateway $BR_GW"
+  fi
   exit 1
 fi
 msg_ok "Gast-IP: $VM_IP"
