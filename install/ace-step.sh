@@ -103,10 +103,10 @@ EOF
 # ---------------------------------------------------------------------------
 VMID="$VMID_ARG" CORES="$CORES_ARG" RAM="$RAM_ARG" DISK="$DISK_ARG"
 STORAGE_ARG="$DEFAULT_STORAGE" BRIDGE="$DEFAULT_BRIDGE" GPU_PCI="" SSHKEY="" CIUSER="$DEFAULT_CIUSER"
-IPCFG="dhcp" GATEWAY=""
+IPCFG="dhcp" GATEWAY="" VMID_FLAG=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --vmid) VMID="$2"; shift 2;;
+    --vmid) VMID="$2"; VMID_FLAG=1; shift 2;;
     --cores) CORES="$2"; shift 2;;
     --memory|--ram) RAM="$2"; shift 2;;
     --disk) DISK="$2"; shift 2;;
@@ -139,7 +139,7 @@ if [[ "$IPCFG" != "dhcp" && "$IPCFG" != */* ]]; then
   fi
 fi
 VMID_EXPLICIT=0
-[[ -n "$VMID_ARG" ]] && VMID_EXPLICIT=1
+[[ -n "$VMID_ARG" || "$VMID_FLAG" == "1" ]] && VMID_EXPLICIT=1
 
 # ---------------------------------------------------------------------------
 # 1. Host-Pruefung
@@ -176,11 +176,25 @@ msg_info "Storage: $STORAGE_ARG | Bridge: $BRIDGE | Modus: $MODE | VM-Name: $APP
 [[ "$CORES" -ge 4 ]] || msg_warn "Unter 4 vCPU wird Torch sehr langsam (gewaehlt: $CORES)."
 [[ "$DISK" -ge 40 ]] || msg_warn "Unter 40 GB wird es mit Modellen + Torch eng (gewaehlt: $DISK)."
 
+# Pre-Flight: freies Host-RAM vs. Wunsch-RAM. Im Update-Modus (VM existiert
+# bereits) zaehlt das konfigurierte RAM – und bei laufender VM ist qm start
+# ein No-Op, daher dort nur Warnung statt Abbruch.
+CHECK_RAM="$RAM"
+VM_RUNNING=0
+if qm status "$VMID" >/dev/null 2>&1; then
+  CFG_RAM="$(qm config "$VMID" 2>/dev/null | grep -oP '^memory: \K[0-9]+' || true)"
+  [[ -n "${CFG_RAM:-}" ]] && CHECK_RAM="$CFG_RAM"
+  qm status "$VMID" 2>/dev/null | grep -q "status: running" && VM_RUNNING=1
+fi
 HOST_FREE_MB="$(free -m 2>/dev/null | awk '/^Mem:/{print $7}' || echo 0)"
-if [[ "$HOST_FREE_MB" -gt 0 && "$RAM" -gt "$HOST_FREE_MB" ]]; then
-  msg_error "Host hat nur ${HOST_FREE_MB} MB frei, VM will ${RAM} MB -> qm start wuerde scheitern."
-  msg_error "Mit weniger RAM erneut starten, z.B.: --memory 8192 (Minimum) oder --memory $HOST_FREE_MB"
-  exit 1
+if [[ "$HOST_FREE_MB" -gt 0 && "$CHECK_RAM" -gt "$HOST_FREE_MB" ]]; then
+  if [[ "$VM_RUNNING" == "1" ]]; then
+    msg_warn "Host hat nur ${HOST_FREE_MB} MB frei, VM hat ${CHECK_RAM} MB (laeuft bereits – weiter)."
+  else
+    msg_error "Host hat nur ${HOST_FREE_MB} MB frei, VM will ${CHECK_RAM} MB -> qm start wuerde scheitern."
+    msg_error "Mit weniger RAM erneut starten, z.B.: --memory 8192 (Minimum) oder --memory $HOST_FREE_MB"
+    exit 1
+  fi
 fi
 
 # SSH-Key: optional – fehlt --sshkey, wird automatisch ein vorhandener
