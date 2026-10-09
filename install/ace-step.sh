@@ -346,7 +346,8 @@ if [[ -z "${VM_IP:-}" ]]; then
   msg_error "--- qm config ---"; qm config "$VMID" || true
   msg_error "--- ARP auf $BRIDGE ---"; ip neigh show dev "$BRIDGE" 2>/dev/null || true
   msg_error "Naechste Schritte:"
-  msg_error " 1) qm terminal $VMID -> login ace -> ip -4 addr; systemctl status qemu-guest-agent"
+  msg_error " 1) Konsole (Passwort ggf. unbekannt -> erst qm set $VMID --cipassword 'X' + qm reboot):"
+  msg_error "    qm terminal $VMID -> login $CIUSER -> ip -4 addr; systemctl status qemu-guest-agent"
   msg_error " 2) Bleibt ip leer: DHCP auf $BRIDGE fehlt -> statische IP setzen und Update-Modus:"
   msg_error "    bash ace-step.sh --vmid $VMID --ip <GEFUNDENE-ODER-GEWUENSCHTE-IP>"
   msg_error "    (mit Netzmaske, z.B. --ip 192.168.178.50/24 --gateway 192.168.178.1:"

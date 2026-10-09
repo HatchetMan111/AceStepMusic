@@ -114,17 +114,21 @@ qm status 100
 ```
 2. Häufigste Ursachen: Cloud-Init Erstboot dauert, DHCP auf `vmbr0` antwortet nicht,
    oder `qemu-guest-agent` im Gast läuft noch nicht.
-3. Konsole öffnen und im Gast prüfen:
+3. Konsole öffnen und im Gast prüfen (Passwort kennst du nicht, falls die
+   Installation nie bis zur Erfolgs-Box kam – erst eins setzen + rebooten):
 ```bash
+qm set 100 --cipassword 'Temp-123-ace'
+qm reboot 100
 qm terminal 100
-# im Gast:
+# Login: <ciuser> / Temp-123-ace, dann im Gast:
 systemctl status qemu-guest-agent --no-pager
 ip -4 addr show
 ```
-4. Schnellweg ohne Warten: bekannte/statische IP direkt übergeben –
-   überspringt den Agent-Wait komplett:
+4. Schnellweg: statische IP mit Maske übergeben – wird in die VM-Config
+   geschrieben + rebootet, Cloud-Init wendet sie an (reine IP ohne Maske
+   überspringt nur den Agent-Wait):
 ```bash
-bash ace-step.sh --vmid 100 --ip 192.168.1.50
+bash ace-step.sh --vmid 100 --ip 192.168.1.50/24 --gateway 192.168.1.1
 ```
 5. Danach Update-Modus erneut laufen lassen (idempotent, VM bleibt bestehen):
 ```bash
